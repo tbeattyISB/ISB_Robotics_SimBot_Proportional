@@ -55,7 +55,6 @@ class Graph(object):
     def addData(self, value):
         self.data.append(value)
 
-
 class Wall(object):
     def __init__(self, x, y, window):
         self.x = x
@@ -67,36 +66,65 @@ class Wall(object):
         self.window.blit(self.image, (self.x, self.y))
 
 
+# Simple player object
 class Player(object):
     def __init__(self, x, y, window):
-        self.x = x
+        self.__x = x
         self.y = y
-        self.speedx = 0
-        self.speedy = 0
+        self.mass = 200
+        self.__v = 0
+        self.power = 0
+        self.error = 0
         self.sensorSampleRate = 0.2
         self.sensor = 800
         self.image = pygame.image.load("robot.png")
-        self.update_ultrasonic()
         # Robot icon made by Turkkub fro www.flaticon.com:  <a href="https://www.flaticon.com/authors/turkkub"        # self.image = pygame.transform.rotate(self.image, 270)
         self.window = window
+        self.update_ultrasonic()
+        self.stopped = True
+        self.start = 0
 
-    # Method to draw object
     def draw(self):
-        self.x += self.speedx
-        self.y += self.speedy
-        self.window.blit(self.image, (self.x, self.y))
+        # Force = motor - friction - resistance
+        fric = self.mass / 10
+        totalAccel = (0.2 * math.copysign(math.pow(self.power, 2), self.power) - math.copysign(fric,
+                                                                                               self.__v or self.power) - 2 * math.copysign(
+            math.pow(self.__v, 2), self.__v)) / self.mass
+        self.__v = self.__v + totalAccel
+        if (abs(self.power) < 10 and abs(self.__v) < 5):
+            self.__v = 0
+            if (self.stopped == False):
+                print(
+                    f'{round(self.ultrasonic_sensor())}px at {(pygame.time.get_ticks() - self.start) / 1000:.2f} seconds')
+                self.stopped = True
+        else:
+            self.stopped = False
+        self.__x += self.__v
+        self.window.blit(self.image, (self.__x, self.y))
 
     # Method to move object (special input of speedx and speedy)
-    def run(self, speed):
-        if speed > 100:
-            speed = 100
-        if speed < -100:
-            speed = -100
-        self.speedx = speed / 5
+    def run(self, power):
+        if power > 100:
+            power = 100
+        if power < -100:
+            power = -100
+        self.power = power
+
+    def runTime(self):
+        return pygame.time.get_ticks() - self.start
 
     def wait(self, time):
+        if (self.start == 0):
+            self.start = pygame.time.get_ticks()
         pygame.time.wait(time)
-        print(self.ultrasonic_sensor())
+        print(f'{round(self.ultrasonic_sensor())}px at {(pygame.time.get_ticks() - self.start) / 1000:.2f} seconds')
+
+    def setPayload(self, mass):
+        if (mass < 0):
+            mass = 0
+        if (mass > 500):
+            mass = 500
+        self.mass = 200 + mass
 
     def ultrasonic_sensor(self):
         return self.sensor
@@ -113,7 +141,7 @@ class Player(object):
 
     def update_ultrasonic(self):
         global wallPos
-        self.sensor = wallPos - self.x
+        self.sensor = wallPos - self.__x
         self.set_timeout(self.update_ultrasonic, 0.002)
 
 
@@ -132,9 +160,9 @@ class MainRun(object):
 
     def Main(self):
         global wallPos
-        # Put all variables up here
         stopped = False
 
+        # Creating the player objects
         wall = Wall(wallPos, 30, self.window)
         player = Player(0, 100, self.window)
         graph = Graph(self.window)
@@ -142,6 +170,7 @@ class MainRun(object):
         cont = Thread(target=self.program, args=(player,))
         cont.setDaemon(True)
 
+        # When you want to draw the player object use its draw() method
         self.window.fill((255, 255, 255))
         player.draw()
         wall.draw()
@@ -149,19 +178,18 @@ class MainRun(object):
         pygame.display.update()
         cont.start()
 
-        speedx = 0
-        speedy = 0
-
         while stopped == False:
             self.window.fill((255, 255, 255),
                              (0, 0, displayw, displayh / 2))  # Tuple for filling display... Current is white
 
+            # Event Tasking
+            # Add all your event tasking things here
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
                     quit()
 
-            # Be sure to redraw your player
+            # And be sure to redraw your player
             player.draw()
             wall.draw()
             pygame.draw.line(self.window, (150, 150, 255), (450, 30), (450, 200), 3)
@@ -171,3 +199,4 @@ class MainRun(object):
             # Remember to update your clock and display at the end
             pygame.display.update()
             self.windowclock.tick(simSpeed)
+
