@@ -1,4 +1,4 @@
-from Robot import MainRun
+from IdealBot import MainRun
 # In this assignement you will use an ideal robot to move between three different positions, without sensors. You are limited to using:
 #
 # while(ultrasonic_sensor()??):..
